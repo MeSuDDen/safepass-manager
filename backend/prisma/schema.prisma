@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               String    @id @default(uuid())
+  email            String    @unique
+  role             String    @default("user")
+  createdAt        DateTime  @default(now())
+  lastLoginAt      DateTime?
+  emailVerified    Boolean   @default(false)
+  profileCompleted Boolean   @default(false)
+
+  credentials       UserCredentials?
+  profile           UserProfile?
+  tokens            UserTokens?
+  logs              Log[]
+  emailVerification EmailVerification?
+  passwordReset     PasswordReset?
+}
+
+model PasswordReset {
+  id         String   @id @default(uuid())
+  userId     String   @unique
+  user       User     @relation(fields: [userId], references: [id])
+  code       String
+  hash       String   @unique
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  isVerified Boolean
+}
+
+model UserCredentials {
+  id             String @id @default(uuid())
+  userId         String @unique
+  user           User   @relation(fields: [userId], references: [id])
+  password       String
+  masterPassword String
+}
+
+model UserProfile {
+  id          String    @id @default(uuid())
+  userId      String    @unique
+  user        User      @relation(fields: [userId], references: [id])
+  firstName   String?
+  lastName    String?
+  middleName  String?
+  phoneNumber String?   @unique
+  birthDate   DateTime?
+  username    String?   @unique
+  position    String?
+}
+
+model UserTokens {
+  id           String  @id @default(uuid())
+  userId       String  @unique
+  user         User    @relation(fields: [userId], references: [id])
+  jwtToken     String?
+  refreshToken String?
+}
+
+model EmailVerification {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  code      String
+  hash      String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
+
+model Log {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  action    String
+  createdAt DateTime @default(now())
+}
