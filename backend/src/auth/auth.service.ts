@@ -1,20 +1,16 @@
 import {
   BadRequestException,
-  ConflictException, ForbiddenException,
+  ForbiddenException,
   Injectable,
-  InternalServerErrorException,
   NotFoundException, UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import * as process from 'process';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
 import { RegisterDto } from './dto/auth.dto';
-import { User } from '@prisma/client';
 import { ConfigService } from '@nestjs/config';
-import { Res } from '@nestjs/common'
 import { Response } from 'express';
 import { Tokens } from './types';
 import { loginDto } from './dto';
