@@ -157,11 +157,11 @@ async correctHash(hash: string, code: string, res: Response ) : Promise<Tokens> 
 
     await this.prismaService.passwordReset.upsert({
       where: { userId: user.id },
-      update: { code, hash, isVerified: false, expiresAt: new Date(Date.now() + 60 * 1000) },
-      create: { userId: user.id, code, hash, isVerified: false, expiresAt: new Date(Date.now() + 60 * 1000) },
+      update: { code, hash, isVerified: false, expiresAt: new Date(Date.now() + 30 * 60 * 1000) },
+      create: { userId: user.id, code, hash, isVerified: false, expiresAt: new Date(Date.now() + 30 * 60 * 1000) },
     });
 
-    await this.emailService.sendPasswordResetEmail(email, code, `https://yourdomain.com/reset-password/${hash} Код активен 1 час`);
+    await this.emailService.sendPasswordResetEmail(email, code, `https://yourdomain.com/reset-password/${hash} Код активен 30 минут`);
     return { message: 'Письмо с инструкцией отправлено' };
   }
 
