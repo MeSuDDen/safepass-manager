@@ -1,3 +1,4 @@
+// jwt-cookie.guard.ts
 import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 
@@ -7,15 +8,20 @@ export class JwtCookieGuard implements CanActivate {
 
   canActivate(context: ExecutionContext): boolean {
     const req = context.switchToHttp().getRequest();
-    const token = req.cookies?.accessToken;
+    console.log(req.cookies);  // Добавь это для проверки cookies в запросе
 
-    if (!token) throw new UnauthorizedException('Отсутствует access token');
+    const token = req.cookies?.accessToken; // Проверка имени куки
+
+    if (!token) {
+      throw new UnauthorizedException('Требуется авторизация');
+    }
 
     try {
       req.user = this.jwtService.verify(token);
       return true;
-    } catch {
-      throw new UnauthorizedException('Неверный или истекший токен');
+    } catch (e) {
+      throw new UnauthorizedException('Недействительный токен');
     }
   }
+
 }

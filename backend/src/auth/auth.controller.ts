@@ -7,19 +7,19 @@ import {
   Post,
   Query, UseGuards,
   UsePipes,
-  Request,
-  ValidationPipe, Req, Res, HttpCode, HttpStatus,
+  ValidationPipe, Req, Res, HttpCode, HttpStatus, UnauthorizedException, NotFoundException,
 } from '@nestjs/common';
+import { Get, UseInterceptors } from '@nestjs/common';
+import { MasterPasswordMiddleware } from 'src/middleware';
 import { Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, VerifyCodeDto } from './dto/auth.dto';
 import { ValidationError } from 'class-validator';
-import { RefreshTokenGuard } from './refresh-token.guard';
-import { JwtAuthGuard } from './jwt-auth.guard';
-import { User } from '@prisma/client';
 import { loginDto } from './dto';
 import { Tokens } from './types';
 import { AuthGuard } from '@nestjs/passport';
+import { PrismaService } from '../prisma/prisma.service';
+import { JwtCookieGuard } from './jwt-cookie.guard';
 
 interface CustomRequest extends Request {
   user: { id: string; refreshToken: string }; // Укажите типы данных, которые ожидаются в user
@@ -27,7 +27,7 @@ interface CustomRequest extends Request {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(private readonly authService: AuthService, private prismaService:PrismaService) {}
 
   // Регистрация нового пользователя
   @Post('register')
@@ -42,16 +42,67 @@ export class AuthController {
 
   // Подтверждение email с кодом
 
-  @Post('email-verify')
+  // @Post('email-verify')
+  // @UsePipes(new ValidationPipe({ whitelist: true }))
+  // async verifyEmail(@Query('hash') hash: string, @Body() body: VerifyCodeDto, @Res({ passthrough: true }) res: Response) : Promise<Tokens> {
+  //   try {
+  //     return await this.authService.correctHash(hash, body.code, res);
+  //   } catch (error) {
+  //     console.error('Ошибка подтверждения email:', error);
+  //     throw error instanceof HttpException ? error : new BadRequestException('Ошибка при подтверждении email');
+  //   }
+  // }
+
+  // @Get('verify-email/:hash')
+  // async checkEmailHash(@Param('hash') hash: string): Promise<{ message: string }> {
+  //   const user = await this.authService.findUserByHash(hash);
+  //
+  //   if (!user) {
+  //     throw new NotFoundException('Хэш не найден');
+  //   }
+  //
+  //   return { message: 'Хэш найден, можно ввести код' };
+  // }
+  // В вашем EmailController
+  @Get('verify-email/:hash')
+  async verifyEmailHash(
+    @Param('hash') hash: string,
+    @Res() res: Response,
+  ) {
+    const result = await this.authService.findUserByHash(hash);
+
+    if (!result.valid) {
+      // Отправляем детализированные ошибки
+      throw new HttpException({result}, 400);
+    }
+
+    return res.status(200).json({ success: true });
+  }
+
+// POST-запрос для проверки кода
+  @Post('verify-email/:hash')
   @UsePipes(new ValidationPipe({ whitelist: true }))
-  async verifyEmail(@Query('hash') hash: string, @Body() body: VerifyCodeDto, @Res({ passthrough: true }) res: Response) : Promise<Tokens> {
+  async verifyEmail(
+    @Param('hash') hash: string,
+    @Body() body: VerifyCodeDto,
+    @Res({ passthrough: true }) res: Response
+  ): Promise<Tokens> {  // Вернем Tokens, так как correctHash возвращает Tokens
+    const user = await this.authService.findUserByHash(hash);
+
+    if (!user) {
+      throw new NotFoundException('Хэш не найден');
+    }
+
     try {
-      return await this.authService.correctHash(hash, body.code, res);
+      return await this.authService.correctHash(hash, body.code, res); // Возвращаем результат напрямую
     } catch (error) {
       console.error('Ошибка подтверждения email:', error);
       throw error instanceof HttpException ? error : new BadRequestException('Ошибка при подтверждении email');
     }
   }
+
+
+
 
 
 // Запрос на сброс пароля
@@ -107,8 +158,42 @@ export class AuthController {
 
 
   @Post('login')
-  @HttpCode(200) // Убираем авто-201 ответ
-  async login(@Body() dto: loginDto) : Promise<Tokens> {
-    return  this.authService.signIn(dto);
+  @HttpCode(200)
+  async login(@Body() dto: loginDto): Promise<{ tokens: Tokens; requiresMasterPassword: boolean }> {
+    const user = await this.prismaService.user.findUnique({
+      where: { email: dto.email },
+    });
+
+    if (!user) throw new UnauthorizedException('Пользователь не найден');
+
+    const tokens = await this.authService.signIn(dto);
+
+    const userTokens = await this.prismaService.userTokens.findUnique({
+      where: { userId: user.id }, // Используем user.id вместо tokens.userId
+    });
+
+    return {
+      tokens,
+      requiresMasterPassword: !userTokens?.isMasterPasswordVerified,
+    };
+  }
+
+
+  @Post('verify-master-password')
+  @UseGuards(AuthGuard('jwt'))
+  @HttpCode(200)
+  async verifyMasterPassword(
+    @Body() dto: { email: string; masterPassword: string }
+  ): Promise<{ message: string }> {
+    return this.authService.verifyMasterPassword(dto);
+  }
+
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  getProfile(@Req() req) {
+    return {
+      isAuthenticated: true,
+      user: req.user // Возвращаем данные пользователя
+    };
   }
 }

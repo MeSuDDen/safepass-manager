@@ -1,5 +1,5 @@
 # Используем Node.js
-FROM node:18-alpine
+FROM node:22.14.0-alpine
   
   # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -12,7 +12,7 @@ RUN npm install
 COPY . .
   
   # Ждем, пока база данных запустится (по желанию)
-CMD ["sh", "-c", "sleep 5 && npm start"]
+CMD ["sh", "-c", "sleep 5 && npm run dev"]
   
   # Приложение слушает 5000 порт
 EXPOSE 5000

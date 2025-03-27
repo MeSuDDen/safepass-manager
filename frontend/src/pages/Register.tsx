@@ -7,6 +7,7 @@ import { TbLockPassword, TbPasswordFingerprint } from "react-icons/tb";
 import { IoMdWarning } from "react-icons/io";
 import { VscQuestion } from "react-icons/vsc";
 import logo from "../assets/images/main-logo.svg";
+import axios from "axios";
 
 export default function RegisterPage() {
     const [email, setEmail] = useState("");
@@ -41,36 +42,17 @@ export default function RegisterPage() {
         setError("");
 
         try {
-            const response = await fetch("http://localhost:3000/auth/register", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    email,
-                    password,
-                    masterKey: masterPassword,
-                }),
+            const response = await axios.post("http://localhost:5000/api/auth/register", {
+                email,
+                password,
+                masterPassword,
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.message || "Ошибка регистрации");
-            }
-
-            // Сохраняем токен в localStorage
-            localStorage.setItem("userEmail", email);
-            if (data.token) {
-                localStorage.setItem("authToken", data.token);
-            }
-
-            // Перенаправление на страницу подтверждения email
-            navigate("/verify-email", { state: { email } });
+            const { emailVerificationHash } = response.data;
+            const verifyEmailLink = `http://localhost:3000/verify-email/${emailVerificationHash}`
+            window.location.href = verifyEmailLink;
         } catch (err) {
-            setError(err.message);
-        } finally {
-            setLoading(false);
+            console.error('Ошибка регистрации', error);
         }
     };
 

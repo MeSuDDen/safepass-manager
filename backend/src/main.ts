@@ -4,6 +4,7 @@ import * as process from 'process';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -29,9 +30,16 @@ async function bootstrap() {
 
   // Глобальный префиск '/api'
   app.setGlobalPrefix('/api');
+  app.use(cookieParser());
+  app.enableCors({
+    origin: 'http://localhost:3000', // Указываем фронтенд адрес
+    credentials: true,
+    methods: 'GET,POST,PUT,DELETE', // Разрешаем нужные методы
+    allowedHeaders: 'Content-Type, Authorization', // Разрешаем заголовки
+  })
 
   // Используем переменную окружения PORT
-  const port = process.env.PORT || 4000;
+  const port = 5000;
 
   // Запуск
   await app.listen(port);

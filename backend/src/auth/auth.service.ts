@@ -48,7 +48,7 @@ export class AuthService {
     expiresAt.setHours(expiresAt.getHours() + 1);
 
     // Создание пользователя в базе данных
-    const user = await this.prismaService.user.create({
+    await this.prismaService.user.create({
       data: {
         email: registerDto.email,
         role: 'user',
@@ -70,50 +70,92 @@ export class AuthService {
 
     // Отправка кода подтверждения на email
     await this.emailService.sendConfirmationEmail(registerDto.email, emailConfirmCode, emailHash);
-    return { message: 'Пользователь успешно зарегистрирован, проверьте почту для подтверждения' };
+
+    // Возвращаем хэш в ответе
+    return {
+      message: 'Пользователь успешно зарегистрирован, проверьте почту для подтверждения',
+      emailVerificationHash: emailHash, // Возвращаем хэш в ответе
+    };
   }
 
-  // Подтверждение email по коду
+  async correctHash(hash: string, code: string, res: Response ) : Promise<Tokens> {
+    const emailVerification = await this.prismaService.emailVerification.findUnique({
+      where: { hash, code },
+      include: { user: true },
+    });
 
-async correctHash(hash: string, code: string, res: Response ) : Promise<Tokens> {
-  const emailVerification = await this.prismaService.emailVerification.findUnique({
-    where: { hash, code },
-    include: { user: true },
-  });
+    if (!emailVerification || emailVerification.expiresAt < new Date()) {
+      if (emailVerification) {
+        await this.prismaService.emailVerification.delete({ where: { id: emailVerification.id } });
+      }
+      throw new BadRequestException('Неверный код подтверждения или он истёк.');
+    }
 
-  if (!emailVerification || emailVerification.expiresAt < new Date()) {
-    throw new BadRequestException('Неверный код подтверждения или он истёк.');
+    // Обновляем статус email-верификации
+    await this.prismaService.user.update({
+      where: { id: emailVerification.userId },
+      data: { emailVerified: true, lastLoginAt: new Date() },
+    });
+
+    // Генерируем JWT-токены
+    const tokens = await this.getTokens(emailVerification.user.id, emailVerification.user.email);
+    const hashedRefreshToken = await this.hashRefreshToken(tokens.refreshToken);
+
+    // Сохраняем refreshToken в БД
+    await this.prismaService.userTokens.upsert({
+      where: { userId: emailVerification.user.id },
+      update: { refreshToken: hashedRefreshToken },
+      create: { userId: emailVerification.user.id, refreshToken: hashedRefreshToken },
+    });
+
+    await this.prismaService.emailVerification.delete({
+      where: { id: emailVerification.id }
+    })
+
+    // **Устанавливаем токены в куки**
+    res.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,  // Доступен только серверу (защита от XSS)
+      secure: false,     // Только HTTPS (отключить в dev-режиме)
+      sameSite: 'lax',  // Lax: защита от CSRF
+      maxAge: 15 * 60 * 1000
+    });
+
+    res.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: false,
+      sameSite: 'lax',
+    });
+    return tokens;
   }
 
-  // Обновляем статус email-верификации
-  await this.prismaService.user.update({
-    where: { id: emailVerification.userId },
-    data: { emailVerified: true, lastLoginAt: new Date() },
-  });
 
-  // Генерируем JWT-токены
-  const tokens = await this.getTokens(emailVerification.user.id, emailVerification.user.email);
-  const hashedRefreshToken = await this.hashRefreshToken(tokens.refreshToken);
 
-  // Сохраняем refreshToken в БД
-  await this.prismaService.userTokens.upsert({
-    where: { userId: emailVerification.user.id },
-    update: { refreshToken: hashedRefreshToken },
-    create: { userId: emailVerification.user.id, refreshToken: hashedRefreshToken },
-  });
+  async findUserByHash(hash: string) {
+    // Поиск пользователя по хэшу
+    const user = await this.prismaService.emailVerification.findUnique({
+      where: {
+        hash: hash,  // Используем поле hash
+      },
+      include: {
+        user: true,
+      },
+    });
+    // Если пользователь не найден, возвращаем null
+    if (!user) {
+      throw new NotFoundException('Хэш не найден');
+    }
+    if (user.expiresAt < new Date()) {
+      throw new BadRequestException('Ссылка устарела');
+    }
+    // Если пользователь найден, возвращаем его
+    return { valid: true, user };
+  }
 
-  await this.prismaService.emailVerification.delete({
-    where: { id: emailVerification.id }
-  })
-
-  console.log('Почта подтверждена, токены сохранили')
-  return tokens
-}
 
   async signIn(dto: loginDto): Promise<Tokens> {
     const user = await this.prismaService.user.findUnique({
       where: { email: dto.email },
-      include: { credentials: true },
+      include: { credentials: true, tokens: true },
     });
 
     if (!user) throw new UnauthorizedException('Пользователь не найден');
@@ -124,17 +166,71 @@ async correctHash(hash: string, code: string, res: Response ) : Promise<Tokens> 
     const passwordValid = await bcrypt.compare(dto.password, user.credentials.password);
     if (!passwordValid) throw new UnauthorizedException('Неверный пароль');
 
+    // Проверяем, не заблокирован ли аккаунт
+    if (user.tokens && user.tokens.failedMasterPasswordAttempts >= 5) {
+      throw new UnauthorizedException(
+        'Аккаунт заблокирован из-за многократных неудачных попыток ввода мастер-пароля'
+      );
+    }
+
+    // Генерируем токены
     const tokens = await this.getTokens(user.id, user.email);
     const hashedRefreshToken = await this.hashRefreshToken(tokens.refreshToken);
 
     await this.prismaService.userTokens.upsert({
       where: { userId: user.id },
-      update: { refreshToken: hashedRefreshToken },
-      create: { userId: user.id, refreshToken: hashedRefreshToken },
+      update: {
+        refreshToken: hashedRefreshToken,
+        isMasterPasswordVerified: false, // После логина сбрасываем 2FA
+        failedMasterPasswordAttempts: 0, // Сбрасываем счетчик попыток
+      },
+      create: {
+        userId: user.id,
+        refreshToken: hashedRefreshToken,
+        isMasterPasswordVerified: false,
+      },
     });
 
     return tokens;
   }
+
+  async verifyMasterPassword(dto: { email: string; masterPassword: string }): Promise<{ message: string }> {
+    const user = await this.prismaService.user.findUnique({
+      where: { email: dto.email },
+      include: { credentials: true, tokens: true },
+    });
+
+    if (!user) throw new UnauthorizedException('Пользователь не найден');
+    if (!user.credentials || !user.credentials.masterPassword) {
+      throw new UnauthorizedException('Мастер-пароль отсутствует');
+    }
+
+    const masterPasswordValid = await bcrypt.compare(dto.masterPassword, user.credentials.masterPassword);
+
+    if (!masterPasswordValid) {
+      const failedAttempts = (user.tokens?.failedMasterPasswordAttempts || 0) + 1;
+
+      if (failedAttempts >= 5) {
+        throw new UnauthorizedException('Аккаунт заблокирован из-за 5 неудачных попыток');
+      }
+
+      await this.prismaService.userTokens.update({
+        where: { userId: user.id },
+        data: { failedMasterPasswordAttempts: failedAttempts },
+      });
+
+      throw new UnauthorizedException('Неверный мастер-пароль');
+    }
+
+    await this.prismaService.userTokens.update({
+      where: { userId: user.id },
+      data: { isMasterPasswordVerified: true, failedMasterPasswordAttempts: 0 },
+    });
+
+    return { message: 'Мастер-пароль успешно подтвержден' };
+  }
+
+
 
 
 // Запрос на сброс пароля
@@ -234,7 +330,7 @@ async correctHash(hash: string, code: string, res: Response ) : Promise<Tokens> 
     ]);
     return {
       accessToken: at,
-      refreshToken: rt
+      refreshToken: rt,
     }
 }
 

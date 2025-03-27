@@ -7,13 +7,14 @@ import { EmailService } from '../email/email.service';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AccessTokenStrategy, RefreshTokenStrategy } from './strategy';
+import { SecureController } from './secure.controller';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({}),
   ],
-  controllers: [ AuthController],
+  controllers: [ AuthController, SecureController],
   providers: [AuthService, AccessTokenStrategy, RefreshTokenStrategy, ConfigService, PrismaService, EmailService, JwtService ],
   exports: [ AuthService ]
 })

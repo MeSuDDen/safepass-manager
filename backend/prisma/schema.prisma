@@ -57,11 +57,13 @@ model UserProfile {
 }
 
 model UserTokens {
-  id           String  @id @default(uuid())
-  userId       String  @unique
-  user         User    @relation(fields: [userId], references: [id])
-  jwtToken     String?
-  refreshToken String?
+  id                           String  @id @default(uuid())
+  userId                       String  @unique
+  user                         User    @relation(fields: [userId], references: [id])
+  jwtToken                     String?
+  refreshToken                 String?
+  isMasterPasswordVerified     Boolean @default(false) // 2FA статус
+  failedMasterPasswordAttempts Int     @default(0) // Количество неудачных попыток ввода мастер-пароля
 }
 
 model EmailVerification {

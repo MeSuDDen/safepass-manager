@@ -1,5 +1,5 @@
 # Используем Node.js
-FROM node:18-alpine
+FROM node:22.14.0-alpine
   
   # Устанавливаем рабочую директорию
 WORKDIR /app
@@ -11,8 +11,6 @@ RUN npm install
   # Копируем весь код
 COPY . .
   
-  # Запускаем React-приложение
-CMD ["npm", "start"]
-  
-  # Приложение слушает 3000 порт
-EXPOSE 3000
+RUN chmod +x entrypoint.sh  # Делаем скрипт исполняемым
+
+ENTRYPOINT ["./entrypoint.sh"]

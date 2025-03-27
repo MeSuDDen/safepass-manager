@@ -10,35 +10,42 @@ import NotFoundPage from "./pages/NotFound.tsx";
 import PrivacyPolicyPage from "./pages/PrivacyPolicy.tsx";
 import VerifyEmail from "./pages/VerifyEmail.tsx";
 import PublicRoute from "./components/PublicRoute/PublicRoute.tsx";
-
-const checkAuth = () => {
-    const token = localStorage.getItem("authToken");
-    return !!token; // Если токен есть → true, иначе → false
-};
+import { useContext } from "react";
+import { AuthContext } from "./components/AuthContext/AuthContext.tsx";
 
 function App() {
-    const isAuthenticated = checkAuth(); // Определяем статус авторизации
+    const auth = useContext(AuthContext);
+
+    if (!auth) {
+        return <div>Ошибка: не удалось загрузить контекст аутентификации</div>;
+    }
+
+    const { isAuthenticated, isLoading } = auth;
+
+    if (isLoading) {
+        return <div>Загрузка...</div>; // Показываем прелоадер, пока идёт проверка авторизации
+    }
 
     return (
         <Routes>
-            {/* Переадресация на страницу авторизации */}
-            <Route path="/" element={<Navigate to="/login"/>}/>
+            <Route path="/" element={<Navigate to="/login" />} />
 
             {/* Авторизация */}
-            <Route element={<AuthLayout />} >
+            <Route element={<AuthLayout />}>
                 <Route path="/login" element={<PublicRoute element={<Login />} isAuthenticated={isAuthenticated} />} />
                 <Route path="/register" element={<PublicRoute element={<Register />} isAuthenticated={isAuthenticated} />} />
                 <Route path="/reset" element={<PublicRoute element={<Reset />} isAuthenticated={isAuthenticated} />} />
-                <Route path="/verify-email" element={<PublicRoute element={<VerifyEmail />} isAuthenticated={isAuthenticated} />} />
+                <Route path="/verify-email/:hash" element={<PublicRoute element={<VerifyEmail />} isAuthenticated={isAuthenticated} />} />
             </Route>
 
-            <Route path="/dashboard/*" element={<ProtectedRoute element={<Dashboard/>} isAuthenticated={isAuthenticated} />}/>
+            {/* Защищённый маршрут */}
+            <Route path="/dashboard/*" element={<ProtectedRoute element={<Dashboard />} isAuthenticated={isAuthenticated} />} />
 
-            {/* Политика конфиденциальности и условия */}
-            <Route path="/privacy-policy" element={<PrivacyPolicyPage/>}/>
+            {/* Политика конфиденциальности */}
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
 
             {/* Ошибка 404 */}
-            <Route path="*" element={<NotFoundPage/>}/>
+            <Route path="*" element={<NotFoundPage />} />
         </Routes>
     );
 }

@@ -4,6 +4,11 @@ import react from '@vitejs/plugin-react-swc'
 import {VitePWA} from 'vite-plugin-pwa'
 
 export default defineConfig({
+    server: {
+        port: 3000,
+        host: true,
+        allowedHosts: ['localhost:5000'],
+    },
     plugins: [react(), tailwindcss(),
         VitePWA({
             registerType: 'autoUpdate',
@@ -11,7 +16,4 @@ export default defineConfig({
                 enabled: true
             }
         })],
-    server: {
-        // allowedHosts: ['*', 'ywmn4g-92-37-143-11.ru.tuna.am'],
-    },
 })

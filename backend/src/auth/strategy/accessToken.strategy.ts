@@ -1,13 +1,13 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
-import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { PassportStrategy } from '@nestjs/passport';
 import { PrismaService } from '../../prisma/prisma.service';
 
 type JwtPayload = {
-  sub: string;
-  email: string;
-}
+  sub: string;  // ID пользователя
+  email: string;  // Электронная почта
+};
 
 @Injectable()
 export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
@@ -16,8 +16,10 @@ export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
     private prismaService: PrismaService
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      secretOrKey: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),  // Используем секрет, полученный из конфигурации
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        (req) => req?.cookies?.accessToken, // Получаем токен из кук
+      ]),
+      secretOrKey: configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
     });
   }
 
@@ -29,7 +31,7 @@ export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
     }
 
     const user = await this.prismaService.user.findUnique({
-      where: { id: payload.sub }, // Теперь ищем по `sub`
+      where: { id: payload.sub }, // Ищем пользователя по `sub`
     });
 
     if (!user) {
@@ -38,6 +40,4 @@ export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
 
     return user;
   }
-
-
 }

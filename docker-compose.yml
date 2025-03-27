@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   db:
     image: postgres:15
@@ -10,11 +8,12 @@ services:
     environment:
       POSTGRES_USER: sudden
       POSTGRES_PASSWORD: Alex210528062207!
-      POSTGRES_DB: bd_safepass
+      POSTGRES_DB: db_safepass
     volumes:
       - db-data:/var/lib/postgresql/data
 
   backend:
+    container_name: safepass-backend
     build: ./backend
     ports:
       - "5000:5000"
@@ -28,6 +27,7 @@ services:
     restart: always
 
   frontend:
+    container_name: safepass-frontend
     build: ./frontend
     ports:
       - "3000:3000"

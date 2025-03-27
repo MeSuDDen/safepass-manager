@@ -1,19 +1,13 @@
-import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate } from "react-router-dom";
+import {JSX} from "react";
 
 interface ProtectedRouteProps {
-    element: React.ReactElement;
+    element: JSX.Element;
     isAuthenticated: boolean;
 }
 
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ element, isAuthenticated }) => {
-    const location = useLocation();
-
-    return isAuthenticated ? (
-        element
-    ) : (
-        <Navigate to="/login" state={{ from: location }} replace />
-    );
+const ProtectedRoute = ({ element, isAuthenticated }: ProtectedRouteProps) => {
+    return isAuthenticated ? element : <Navigate to="/login" />;
 };
 
 export default ProtectedRoute;
