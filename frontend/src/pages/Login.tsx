@@ -20,22 +20,18 @@ export default function LoginPage() {
         setError("");
 
         try {
-            const response = await axios.post("http://localhost:3000/auth/login", {
-                email,
-                password
-            });
+            const response = await axios.post(
+                "http://localhost:5000/api/auth/login",
+                { email, password },
+                { withCredentials: true } // Обязательно для работы с куками
+            );
 
-            console.log("Server Response:", response.data); // ✅ Логируем ответ
+            console.log("Server Response:", response.data);
 
-            const { accessToken } = response.data; // ✅ Проверяем, как сервер называет токен
-
-            if (accessToken) {
-                localStorage.setItem("authToken", accessToken);
-                console.log("Token saved:", localStorage.getItem("authToken")); // ✅ Проверяем, записался ли токен
-                navigate("/dashboard");
+            if (response.data.requiresMasterPassword) {
+                navigate("/master-password"); // Переход на ввод мастер-пароля
             } else {
-                console.error("Token is missing in response!");
-                setError("Ошибка при получении токена.");
+                navigate("/dashboard"); // Если не требуется мастер-пароль
             }
         } catch (err) {
             console.error("Login error:", err);

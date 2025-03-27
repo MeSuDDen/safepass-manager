@@ -152,7 +152,7 @@ export class AuthService {
   }
 
 
-  async signIn(dto: loginDto): Promise<Tokens> {
+  async signIn(dto: loginDto, response: Response): Promise<Tokens> {
     const user = await this.prismaService.user.findUnique({
       where: { email: dto.email },
       include: { credentials: true, tokens: true },
@@ -191,8 +191,24 @@ export class AuthService {
       },
     });
 
+    // Устанавливаем токены в cookies
+    response.cookie('accessToken', tokens.accessToken, {
+      httpOnly: true,  // Доступен только серверу (защита от XSS)
+      secure: process.env.NODE_ENV === 'production', // Только HTTPS в продакшене
+      sameSite: 'lax',  // Защита от CSRF
+      maxAge: 15 * 60 * 1000, // 15 минут
+    });
+
+    response.cookie('refreshToken', tokens.refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+    });
+
     return tokens;
   }
+
 
   async verifyMasterPassword(dto: { email: string; masterPassword: string }): Promise<{ message: string }> {
     const user = await this.prismaService.user.findUnique({
@@ -360,9 +376,16 @@ export class AuthService {
     return tokens;
   }
 
-  async logout(userId: string) {
-    await this.prismaService.userTokens.deleteMany({ where: { userId } });
-    return { message: 'Вы вышли из системы' };
+  // async logout(userId: string) {
+  //   await this.prismaService.userTokens.deleteMany({ where: { userId } });
+  //   return { message: 'Вы вышли из системы' };
+  // }
+
+  async logout(refreshToken: string): Promise<void> {
+    await this.prismaService.userTokens.updateMany({
+      where: { refreshToken },
+      data: { refreshToken: null },
+    });
   }
 
   // Хэширование пароля

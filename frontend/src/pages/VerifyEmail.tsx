@@ -1,15 +1,15 @@
-import React, {useState, useEffect} from 'react';
-import {useNavigate, useParams} from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useParams } from 'react-router-dom';
 import axios from 'axios';
-import {Alert, Button, Input, Typography} from '@material-tailwind/react';
-import {IoMdWarning} from 'react-icons/io';
+import { Alert, Button, Input, Typography } from '@material-tailwind/react';
+import { IoMdWarning } from 'react-icons/io';
 import logo from '../assets/images/main-logo.svg';
 
 const VerifyEmail: React.FC = () => {
-    const {hash} = useParams<{ hash: string }>(); // Получаем hash из URL
+    const { hash } = useParams<{ hash: string }>(); // Получаем hash из URL
     const [code, setCode] = useState<string>(''); // Добавляем состояние для verifyCode
-    const [error, setError] = useState<string>('');
-    const [isLoading, setIsLoading] = useState<boolean>(true);
+    const [error, setError] = useState<string>(''); // Ошибка
+    const [isLoading, setIsLoading] = useState<boolean>(true); // Статус загрузки
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -49,7 +49,6 @@ const VerifyEmail: React.FC = () => {
                 }
 
                 setError(`${errorMessage}. ${instructions}`);
-
             } finally {
                 setIsLoading(false);
             }
@@ -58,7 +57,6 @@ const VerifyEmail: React.FC = () => {
         verifyHash();
     }, [hash]);
 
-
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         setCode(e.target.value);
     };
@@ -66,7 +64,7 @@ const VerifyEmail: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
-        setError('');
+        setError(''); // Сбрасываем ошибку при отправке
 
         try {
             const response = await axios.post(
@@ -78,9 +76,6 @@ const VerifyEmail: React.FC = () => {
             // Лучше проверять статус ответа, а не текст сообщения
             if (response.status === 200) {
                 // Сохраняем данные авторизации, если они приходят с сервера
-                if (response.data.token) {
-                    localStorage.setItem('authToken', response.data.token);
-                }
                 navigate('/dashboard', { replace: true });
             }
         } catch (err) {
@@ -109,45 +104,43 @@ const VerifyEmail: React.FC = () => {
     return (
         <div className="flex flex-col gap-4 items-center">
             <div className="flex justify-center gap-4 items-center">
-                <img src={logo} alt="SafePass" width="40px"/>
+                <img src={logo} alt="SafePass" width="40px" />
                 <h1 className="font-bold text-3xl">SafePass</h1>
             </div>
 
             <h1 className="text-center font-bold text-2xl">Подтверждение почты</h1>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4 w-80">
-
-                {!error && (
-                    <div>
-                        <Typography as="label" htmlFor="verifyCode" type="small" color="default" className="font-semibold">
-                            Введите код подтверждения:
-                        </Typography>
-                            <Input
-                                id="verifyCode"
-                                type="text"
-                                placeholder="******"
-                                value={code}
-                                onChange={handleInputChange}
-                                required
-                                maxLength={6}
-                                className="data-[icon-placement=start]:!pl-[36px]"
-                            />
-                    </div>
-                )}
-
+                {/* Если есть ошибка, показываем alert */}
                 {error && (
                     <Alert color="warning">
                         <Alert.Icon>
-                            <IoMdWarning size={20}/>
+                            <IoMdWarning size={20} />
                         </Alert.Icon>
                         <Alert.Content>{error}</Alert.Content>
                     </Alert>
                 )}
-                {!error && (
-                    <Button type="submit" isFullWidth={true} disabled={isLoading}>
-                        {isLoading ? 'Подтверждение...' : 'Подтвердить'}
-                    </Button>
-                )}
+                {/* Поле ввода кода подтверждения всегда отображается */}
+                <div>
+                    <Typography as="label" htmlFor="verifyCode" type="small" color="default" className="font-semibold">
+                        Введите код подтверждения:
+                    </Typography>
+                    <Input
+                        id="verifyCode"
+                        type="text"
+                        placeholder="******"
+                        value={code}
+                        onChange={handleInputChange}
+                        required
+                        maxLength={6}
+                        className="data-[icon-placement=start]:!pl-[36px]"
+                    />
+                </div>
+
+                {/* Кнопка отправки */}
+                <Button type="submit" isFullWidth={true} disabled={isLoading}>
+                    {isLoading ? 'Подтверждение...' : 'Подтвердить'}
+                </Button>
             </form>
         </div>
     );

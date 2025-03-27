@@ -11,7 +11,7 @@ import {
 } from '@nestjs/common';
 import { Get, UseInterceptors } from '@nestjs/common';
 import { MasterPasswordMiddleware } from 'src/middleware';
-import { Response } from 'express';
+import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, VerifyCodeDto } from './dto/auth.dto';
 import { ValidationError } from 'class-validator';
@@ -20,6 +20,7 @@ import { Tokens } from './types';
 import { AuthGuard } from '@nestjs/passport';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtCookieGuard } from './jwt-cookie.guard';
+import * as cookieParser from 'cookie-parser';
 
 interface CustomRequest extends Request {
   user: { id: string; refreshToken: string }; // Укажите типы данных, которые ожидаются в user
@@ -81,6 +82,7 @@ export class AuthController {
 
 // POST-запрос для проверки кода
   @Post('verify-email/:hash')
+  @HttpCode(200)
   @UsePipes(new ValidationPipe({ whitelist: true }))
   async verifyEmail(
     @Param('hash') hash: string,
@@ -147,35 +149,53 @@ export class AuthController {
     return this.authService.refreshAccessToken(user['sub'], user['refreshToken']);
   }
 
-  @Post('logout')
-  @UseGuards(AuthGuard('jwt'))
-  @HttpCode(HttpStatus.OK)
-  async logout(@Req() req: CustomRequest, @Res() res: Response) {
-    const user = req.user;
-    await this.authService.logout(user['sub']);
-    return res.json({ message: 'Вы вышли из системы' });
-  }
+  // @Post('logout')
+  // @UseGuards(AuthGuard('jwt'))
+  // @HttpCode(HttpStatus.OK)
+  // async logout(@Req() req: CustomRequest, @Res() res: Response) {
+  //   const user = req.user;
+  //   await this.authService.logout(user['sub']);
+  //   return res.json({ message: 'Вы вышли из системы' });
+  // }
 
+  @Post('logout')
+  @HttpCode(200)
+  async logout(@Res() response: Response, @Req() req: Request) {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException("Вы уже вышли из системы.");
+    }
+
+    // Удаляем refreshToken из базы
+    await this.authService.logout(refreshToken);
+
+    // Очищаем куки
+    response.clearCookie('accessToken', { httpOnly: true, secure: false, sameSite: 'lax' });
+    response.clearCookie('refreshToken', { httpOnly: true, secure: false, sameSite: 'lax' });
+
+    return response.json({ message: "Вы успешно вышли." });
+  }
 
   @Post('login')
   @HttpCode(200)
-  async login(@Body() dto: loginDto): Promise<{ tokens: Tokens; requiresMasterPassword: boolean }> {
+  async login(
+    @Body() dto: loginDto,
+    @Res() response: Response
+  ): Promise<void> {  // Изменил возврат на void, так как используем response
     const user = await this.prismaService.user.findUnique({
       where: { email: dto.email },
     });
 
     if (!user) throw new UnauthorizedException('Пользователь не найден');
 
-    const tokens = await this.authService.signIn(dto);
+    await this.authService.signIn(dto, response);
 
     const userTokens = await this.prismaService.userTokens.findUnique({
-      where: { userId: user.id }, // Используем user.id вместо tokens.userId
+      where: { userId: user.id },
     });
 
-    return {
-      tokens,
-      requiresMasterPassword: !userTokens?.isMasterPasswordVerified,
-    };
+    response.json({ requiresMasterPassword: !userTokens?.isMasterPasswordVerified });
   }
 
 

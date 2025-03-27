@@ -50,7 +50,7 @@ export default function RegisterPage() {
 
             const { emailVerificationHash } = response.data;
             const verifyEmailLink = `http://localhost:3000/verify-email/${emailVerificationHash}`
-            window.location.href = verifyEmailLink;
+            navigate(`/verify-email/${emailVerificationHash}`)
         } catch (err) {
             console.error('Ошибка регистрации', error);
         }
