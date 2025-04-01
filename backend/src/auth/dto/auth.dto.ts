@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDate,
   IsEmail,
   IsHash,
@@ -17,16 +18,26 @@ export class RegisterDto {
   email: string;
 
   @IsNotEmpty()
-  @IsString({message: 'Пароль должен быть строкой'})
-  @Length(8, 25, {message: 'Пароль должен быть от 8 до 25 символов'})
-  @IsStrongPassword({minUppercase: 1, minSymbols: 1, minLength: 8}, {message: 'Пароль должен содержать как минимум одну заглавную букву и один специальный символ'})
+  @IsString({ message: 'Пароль должен быть строкой' })
+  @Length(8, 25, { message: 'Пароль должен быть от 8 до 25 символов' })
+  @IsStrongPassword({ minUppercase: 1, minSymbols: 1, minLength: 8 }, { message: 'Пароль должен содержать как минимум одну заглавную букву и один специальный символ' })
   password: string;
 
   @IsNotEmpty()
-  @IsString({message: 'Пароль должен быть строкой'})
-  @Length(8, 25, {message: 'Пароль должен быть от 8 до 25 символов'})
-  @IsStrongPassword({minUppercase: 1, minSymbols: 1, minLength: 8}, {message: 'Пароль должен содержать как минимум одну заглавную букву и один специальный символ'})
-  masterPassword:string;
+  @IsString({ message: 'ППароль должен быть строкой' })
+  @Length(8, 25, { message: 'ППароль должен быть от 8 до 25 символов' })
+  @IsStrongPassword({ minUppercase: 1, minSymbols: 1, minLength: 8 }, { message: 'ППароль должен содержать как минимум одну заглавную букву и один специальный символ' })
+  masterPassword: string;
+
+  @IsNotEmpty()
+  @IsString({ message: 'ППароль должен быть строкой' })
+  confirmMasterPassword: string;
+
+  // Уберите confirmMasterPassword, если он не должен быть частью DTO
+  // Валидацию на совпадение masterPassword и confirmMasterPassword можно делать на уровне сервера, если поля для этого не отправляются
+
+  @IsBoolean({always: true})
+  agree: boolean;
 }
 
 export class EmailVerificationDto {

@@ -7,6 +7,13 @@ export default {
         "./src/**/*.{js,ts,jsx,tsx}",
         "./node_modules/@material-tailwind/react/**/*.{js,ts,jsx,tsx}",
     ],
+    theme: {
+        extend: {
+            fontFamily: {
+                sans: ["Roboto", "sans-serif"],
+            }
+        }
+    },
     plugins: [
         mtConfig({
             colors: {

@@ -26,6 +26,16 @@ export class AuthService {
 
   // Регистрация пользователя
   async signUp(registerDto: RegisterDto) {
+    // Проверка согласия пользователя
+    if (!registerDto.agree) {
+      throw new BadRequestException('Вы должны согласиться с условиями.');
+    }
+
+    // Проверка на совпадение masterPassword и confirmMasterPassword
+    if (registerDto.masterPassword !== registerDto.confirmMasterPassword) {
+      throw new BadRequestException('Пароли не совпадают.');
+    }
+
     // Проверка уникальности email
     const existingUser = await this.prismaService.user.findUnique({
       where: { email: registerDto.email },
@@ -52,7 +62,7 @@ export class AuthService {
       data: {
         email: registerDto.email,
         role: 'user',
-        credentials: {
+        passwords: {
           create: {
             password: hashedPassword,
             masterPassword: hashedMasterPassword,
@@ -155,15 +165,15 @@ export class AuthService {
   async signIn(dto: loginDto, response: Response): Promise<Tokens> {
     const user = await this.prismaService.user.findUnique({
       where: { email: dto.email },
-      include: { credentials: true, tokens: true },
+      include: { passwords: true, tokens: true },
     });
 
     if (!user) throw new UnauthorizedException('Пользователь не найден');
-    if (!user.credentials || !user.credentials.password) {
+    if (!user.passwords || !user.passwords.password) {
       throw new UnauthorizedException('Данные учетной записи отсутствуют');
     }
 
-    const passwordValid = await bcrypt.compare(dto.password, user.credentials.password);
+    const passwordValid = await bcrypt.compare(dto.password, user.passwords.password);
     if (!passwordValid) throw new UnauthorizedException('Неверный пароль');
 
     // Проверяем, не заблокирован ли аккаунт
@@ -179,7 +189,13 @@ export class AuthService {
 
     await this.prismaService.userTokens.upsert({
       where: { userId: user.id },
+      include: { user: true },
       update: {
+        user: {
+          update:{
+            lastLoginAt: new Date(),
+          },
+        },
         refreshToken: hashedRefreshToken,
         isMasterPasswordVerified: false, // После логина сбрасываем 2FA
         failedMasterPasswordAttempts: 0, // Сбрасываем счетчик попыток
@@ -195,15 +211,13 @@ export class AuthService {
     response.cookie('accessToken', tokens.accessToken, {
       httpOnly: true,  // Доступен только серверу (защита от XSS)
       secure: process.env.NODE_ENV === 'production', // Только HTTPS в продакшене
-      sameSite: 'lax',  // Защита от CSRF
-      maxAge: 15 * 60 * 1000, // 15 минут
+      sameSite: 'strict',  // Защита от CSRF
     });
 
     response.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
+      sameSite: 'strict',
     });
 
     return tokens;
@@ -213,15 +227,15 @@ export class AuthService {
   async verifyMasterPassword(dto: { email: string; masterPassword: string }): Promise<{ message: string }> {
     const user = await this.prismaService.user.findUnique({
       where: { email: dto.email },
-      include: { credentials: true, tokens: true },
+      include: { passwords: true, tokens: true },
     });
 
     if (!user) throw new UnauthorizedException('Пользователь не найден');
-    if (!user.credentials || !user.credentials.masterPassword) {
+    if (!user.passwords || !user.passwords.masterPassword) {
       throw new UnauthorizedException('Мастер-пароль отсутствует');
     }
 
-    const masterPasswordValid = await bcrypt.compare(dto.masterPassword, user.credentials.masterPassword);
+    const masterPasswordValid = await bcrypt.compare(dto.masterPassword, user.passwords.masterPassword);
 
     if (!masterPasswordValid) {
       const failedAttempts = (user.tokens?.failedMasterPasswordAttempts || 0) + 1;
@@ -311,7 +325,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
     await this.prismaService.user.update({
       where: { id: resetRequest.userId },
-      data: { credentials: { update: { password: hashedPassword } } }
+      data: { passwords: { update: { password: hashedPassword } } }
     });
 
     await this.prismaService.passwordReset.delete({ where: { id: resetRequest.id } });
@@ -351,28 +365,39 @@ export class AuthService {
 }
 
   // Обновление Access Token с помощью Refresh Token
-  async refreshAccessToken(userId: string, refreshToken: string) {
+  async refreshAccessToken(userId: string, refreshToken: string): Promise<Tokens> {
+    // Находим пользователя и его токены
     const user = await this.prismaService.user.findFirst({
       where: { id: userId },
       include: { tokens: true }, // Загружаем токены
     });
 
-    if (!user || !user.tokens?.refreshToken) throw new UnauthorizedException('Доступ запрещён');
+    console.log("Токен из запроса:", refreshToken);
+    console.log("Токен из базы данных:", user?.tokens?.refreshToken);
+
+    if (!user || !user.tokens?.refreshToken) {
+      throw new UnauthorizedException('Доступ запрещён');
+    }
 
     // Проверяем совпадение refresh-токена
     const isRefreshTokenValid = await bcrypt.compare(refreshToken, user.tokens.refreshToken);
-    if (!isRefreshTokenValid) throw new UnauthorizedException('Неверный Refresh Token');
+    if (!isRefreshTokenValid) {
+      throw new UnauthorizedException('Неверный Refresh Token');
+    }
 
+    // Генерация нового Access и Refresh токенов
     const tokens = await this.getTokens(user.id, user.email);
+
+    // Хэширование нового Refresh Token
     const hashedRefreshToken = await this.hashRefreshToken(tokens.refreshToken);
 
+    // Обновляем refreshToken в базе данных
     await this.prismaService.userTokens.update({
       where: { userId: user.id },
       data: { refreshToken: hashedRefreshToken },
     });
 
-
-
+    // Возвращаем новые токены
     return tokens;
   }
 

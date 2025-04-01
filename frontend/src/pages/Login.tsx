@@ -1,49 +1,46 @@
-import {Alert, Button, Input, Typography} from "@material-tailwind/react";
+import { Button, Input, Typography } from "@material-tailwind/react";
 import { Link, useNavigate } from "react-router-dom";
 import { MdOutlineEmail } from "react-icons/md";
 import { TbLockPassword } from "react-icons/tb";
 import logo from "../assets/images/main-logo.svg";
-import { useState } from "react";
-import axios from "axios";
-import {IoMdWarning} from "react-icons/io";
+import { useForm } from "react-hook-form";
+import { useAuth } from "../context/AuthContext/AuthContext.tsx";
+import {toast, Toaster} from "react-hot-toast";
+import {useEffect, useState} from "react";
+import {LoginFormValues} from "../types";
 
 export default function LoginPage() {
-    const [email, setEmail] = useState("");
-    const [password, setPassword] = useState("");
-    const [error, setError] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
+    const { login, isLoading, user } = useAuth();
+    const [Loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
-    const handleLogin = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setIsLoading(true);
-        setError("");
+    useEffect(() => {
+        if (!isLoading && user) {
+            navigate("/dashboard"); // Редирект на дашборд, если пользователь уже авторизован
+        }
+    }, [user, isLoading, navigate]);
 
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+    } = useForm<LoginFormValues>();
+
+    const onSubmit = async (data: LoginFormValues) => {
+        setLoading(true);
         try {
-            const response = await axios.post(
-                "http://localhost:5000/api/auth/login",
-                { email, password },
-                { withCredentials: true } // Обязательно для работы с куками
-            );
-
-            console.log("Server Response:", response.data);
-
-            if (response.data.requiresMasterPassword) {
-                navigate("/master-password"); // Переход на ввод мастер-пароля
-            } else {
-                navigate("/dashboard"); // Если не требуется мастер-пароль
-            }
-        } catch (err) {
-            console.error("Login error:", err);
-            setError("Неправильная почта или пароль.");
+            await login(data.email, data.password);
+        } catch (error) {
+            console.error("Ошибка входа:", error);
+            toast.error("Неправильная почта или пароль.");
         } finally {
-            setIsLoading(false);
+            setLoading(false);
         }
     };
 
-
     return (
         <div className="flex flex-col gap-4 items-center">
+            <Toaster />
             <div className="flex justify-center gap-4 items-center">
                 <img src={logo} alt="SafePass" width="40px" />
                 <h1 className="font-bold text-3xl">SafePass</h1>
@@ -51,7 +48,7 @@ export default function LoginPage() {
 
             <h1 className="text-center font-bold text-2xl">Авторизация</h1>
 
-            <form onSubmit={handleLogin} className="flex flex-col gap-4 w-80">
+            <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4 w-80">
                 {/* Поле email */}
                 <div className="space-y-1">
                     <Typography as="label" htmlFor="email" type="small" color="default" className="font-semibold">
@@ -61,15 +58,14 @@ export default function LoginPage() {
                         id="email"
                         type="email"
                         placeholder="someone@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
+                        {...register("email", { required: "Введите почту" })}
                         className="data-[icon-placement=start]:!pl-[36px]"
                     >
                         <Input.Icon className="data-[placement=start]:left-px w-full bg-white w-fit">
                             <MdOutlineEmail size={20} className="ml-2" />
                         </Input.Icon>
                     </Input>
+                    {errors.email && <p className="text-red-500 text-sm">{errors.email.message}</p>}
                 </div>
 
                 {/* Поле пароля */}
@@ -81,30 +77,19 @@ export default function LoginPage() {
                         id="password"
                         type="password"
                         placeholder="********"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
+                        {...register("password", { required: "Введите пароль" })}
                         className="data-[icon-placement=start]:!pl-[36px]"
                     >
                         <Input.Icon className="data-[placement=start]:left-px w-full bg-white w-fit">
                             <TbLockPassword size={20} className="ml-2" />
                         </Input.Icon>
                     </Input>
+                    {errors.password && <p className="text-red-500 text-sm">{errors.password.message}</p>}
                 </div>
-
-                {/* Ошибка */}
-                {error && (
-                    <Alert color={"warning"}>
-                        <Alert.Icon>
-                            <IoMdWarning size={20} />
-                        </Alert.Icon>
-                        <Alert.Content>{error}</Alert.Content>
-                    </Alert>
-                )}
 
                 {/* Кнопка входа */}
                 <Button type="submit" isFullWidth={true} disabled={isLoading}>
-                    {isLoading ? "Вход..." : "Войти"}
+                    {Loading ? "Вход..." : "Войти"}
                 </Button>
             </form>
 

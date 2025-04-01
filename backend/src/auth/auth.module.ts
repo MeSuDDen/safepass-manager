@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtModule, JwtService } from '@nestjs/jwt';
@@ -7,15 +7,20 @@ import { EmailService } from '../email/email.service';
 import { PassportModule } from '@nestjs/passport';
 import { ConfigService } from '@nestjs/config';
 import { AccessTokenStrategy, RefreshTokenStrategy } from './strategy';
-import { SecureController } from './secure.controller';
+import { TokenRefreshMiddleware } from '../middleware';
 
 @Module({
   imports: [
     PassportModule.register({ defaultStrategy: 'jwt' }),
     JwtModule.register({}),
   ],
-  controllers: [ AuthController, SecureController],
+  controllers: [ AuthController],
   providers: [AuthService, AccessTokenStrategy, RefreshTokenStrategy, ConfigService, PrismaService, EmailService, JwtService ],
   exports: [ AuthService ]
 })
-export class AuthModule {}
+
+export class AuthModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(TokenRefreshMiddleware).forRoutes('*'); // Применяем middleware ко всем маршрутам
+  }
+}

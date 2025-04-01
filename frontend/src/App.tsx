@@ -1,52 +1,57 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import {Routes, Route, Navigate} from "react-router-dom";
 import "./index.css";
 import AuthLayout from "./components/Auth/AuthLayout/AuthLayout.tsx";
+
+// Pages
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Reset from "./pages/Reset";
 import Dashboard from "./pages/Dashboard";
-import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.tsx";
 import NotFoundPage from "./pages/NotFound.tsx";
 import PrivacyPolicyPage from "./pages/PrivacyPolicy.tsx";
 import VerifyEmail from "./pages/VerifyEmail.tsx";
-import PublicRoute from "./components/PublicRoute/PublicRoute.tsx";
-import { useContext } from "react";
-import { AuthContext } from "./components/AuthContext/AuthContext.tsx";
+import Credentials from "./pages/Credentials.tsx";
+import Folders from "./pages/Folders.tsx";
+import Admin from "./pages/Admin.tsx";
+
+import {AuthProvider} from "./context/AuthContext/AuthContext.tsx";
+import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.tsx";
+import {Toaster} from "react-hot-toast";
+import DashboardLayout from "./components/ui/DashboardLayout.tsx";
+
 
 function App() {
-    const auth = useContext(AuthContext);
-
-    if (!auth) {
-        return <div>Ошибка: не удалось загрузить контекст аутентификации</div>;
-    }
-
-    const { isAuthenticated, isLoading } = auth;
-
-    if (isLoading) {
-        return <div>Загрузка...</div>; // Показываем прелоадер, пока идёт проверка авторизации
-    }
-
     return (
-        <Routes>
-            <Route path="/" element={<Navigate to="/login" />} />
+        <>
+            <Toaster position="top-center" toastOptions={{duration: 3000, removeDelay: 1000}}></Toaster>
+            <AuthProvider>
+                <Routes>
 
-            {/* Авторизация */}
-            <Route element={<AuthLayout />}>
-                <Route path="/login" element={<PublicRoute element={<Login />} isAuthenticated={isAuthenticated} />} />
-                <Route path="/register" element={<PublicRoute element={<Register />} isAuthenticated={isAuthenticated} />} />
-                <Route path="/reset" element={<PublicRoute element={<Reset />} isAuthenticated={isAuthenticated} />} />
-                <Route path="/verify-email/:hash" element={<PublicRoute element={<VerifyEmail />} isAuthenticated={isAuthenticated} />} />
-            </Route>
+                    <Route path="/" element={<Navigate to="/login" replace/>}/>
 
-            {/* Защищённый маршрут */}
-            <Route path="/dashboard/*" element={<ProtectedRoute element={<Dashboard />} isAuthenticated={isAuthenticated} />} />
+                    {/* Авторизация */}
+                    <Route element={<AuthLayout/>}>
+                        <Route path="/login" element={<Login/>}/>
+                        <Route path="/register" element={<Register/>}/>
+                        <Route path="/reset" element={<Reset/>}/>
+                        <Route path="/verify-email/:hash" element={<VerifyEmail/>}/>
+                    </Route>
 
-            {/* Политика конфиденциальности */}
-            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                    {/* Защищённый маршрут */}
+                    <Route element={<DashboardLayout/>}>
+                        <Route path="/dashboard/*" element={<ProtectedRoute><Dashboard/></ProtectedRoute>}/>
+                        <Route path="/credentials/*" element={<ProtectedRoute><Credentials/></ProtectedRoute>}/>
+                        <Route path="/folders/*" element={<ProtectedRoute><Folders/></ProtectedRoute>}/>
+                        <Route path="/admin-panel/*" element={<ProtectedRoute><Admin/></ProtectedRoute>}/>
+                    </Route>
+                    {/* Политика конфиденциальности */}
+                    <Route path="/privacy-policy" element={<PrivacyPolicyPage/>}/>
 
-            {/* Ошибка 404 */}
-            <Route path="*" element={<NotFoundPage />} />
-        </Routes>
+                    {/* Ошибка 404 */}
+                    <Route path="*" element={<NotFoundPage/>}/>
+                </Routes>
+            </AuthProvider>
+        </>
     );
 }
 

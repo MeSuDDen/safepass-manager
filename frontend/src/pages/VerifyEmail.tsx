@@ -4,6 +4,7 @@ import axios from 'axios';
 import { Alert, Button, Input, Typography } from '@material-tailwind/react';
 import { IoMdWarning } from 'react-icons/io';
 import logo from '../assets/images/main-logo.svg';
+import {Toaster} from "react-hot-toast";
 
 const VerifyEmail: React.FC = () => {
     const { hash } = useParams<{ hash: string }>(); // Получаем hash из URL
@@ -103,6 +104,7 @@ const VerifyEmail: React.FC = () => {
 
     return (
         <div className="flex flex-col gap-4 items-center">
+            <Toaster position="top-center" toastOptions={{duration: 3000, removeDelay: 1000}}></Toaster>
             <div className="flex justify-center gap-4 items-center">
                 <img src={logo} alt="SafePass" width="40px" />
                 <h1 className="font-bold text-3xl">SafePass</h1>

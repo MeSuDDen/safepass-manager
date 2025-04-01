@@ -9,8 +9,7 @@ import {
   UsePipes,
   ValidationPipe, Req, Res, HttpCode, HttpStatus, UnauthorizedException, NotFoundException,
 } from '@nestjs/common';
-import { Get, UseInterceptors } from '@nestjs/common';
-import { MasterPasswordMiddleware } from 'src/middleware';
+import { Get } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto, VerifyCodeDto } from './dto/auth.dto';
@@ -19,8 +18,8 @@ import { loginDto } from './dto';
 import { Tokens } from './types';
 import { AuthGuard } from '@nestjs/passport';
 import { PrismaService } from '../prisma/prisma.service';
-import { JwtCookieGuard } from './jwt-cookie.guard';
-import * as cookieParser from 'cookie-parser';
+import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 
 interface CustomRequest extends Request {
   user: { id: string; refreshToken: string }; // Укажите типы данных, которые ожидаются в user
@@ -28,7 +27,7 @@ interface CustomRequest extends Request {
 
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService, private prismaService:PrismaService) {}
+  constructor(private readonly authService: AuthService, private prismaService:PrismaService, private  configService: ConfigService, private jwtService: JwtService) {}
 
   // Регистрация нового пользователя
   @Post('register')
@@ -141,12 +140,33 @@ export class AuthController {
   }
 
   @Post('refresh')
-  @UseGuards(AuthGuard('jwt-refresh'))
   @HttpCode(HttpStatus.OK)
-  refresh(@Req() req:CustomRequest) {
-    const user = req.user;
-    console.log(user.id, user.refreshToken)
-    return this.authService.refreshAccessToken(user['sub'], user['refreshToken']);
+  async refresh(@Req() req: Request, @Res() res) {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (!refreshToken) {
+      throw new UnauthorizedException('Refresh token отсутствует');
+    }
+
+    try {
+      const refreshPayload = this.jwtService.verify(refreshToken, {
+        secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+      });
+
+      const tokens = await this.authService.refreshAccessToken(refreshPayload.sub, refreshToken);
+
+      res.cookie('accessToken', tokens.accessToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 15 * 60 * 1000,
+      });
+
+      return res.json({ accessToken: tokens.accessToken });
+    } catch (error) {
+      console.error("Ошибка при обновлении токена:", error);
+      throw new UnauthorizedException('Ошибка при обновлении токена');
+    }
   }
 
   // @Post('logout')
@@ -185,6 +205,9 @@ export class AuthController {
   ): Promise<void> {  // Изменил возврат на void, так как используем response
     const user = await this.prismaService.user.findUnique({
       where: { email: dto.email },
+      include: {
+        profile: true,
+      }
     });
 
     if (!user) throw new UnauthorizedException('Пользователь не найден');
@@ -195,7 +218,7 @@ export class AuthController {
       where: { userId: user.id },
     });
 
-    response.json({ requiresMasterPassword: !userTokens?.isMasterPasswordVerified });
+    response.json({user, requiresMasterPassword: !userTokens?.isMasterPasswordVerified });
   }
 
 
@@ -209,11 +232,29 @@ export class AuthController {
   }
 
   @Get('me')
-  @UseGuards(AuthGuard('jwt'))
-  getProfile(@Req() req) {
+  async getProfile(@Req() req) {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      throw new UnauthorizedException('Пользователь не найден');
+    }
+
+    // Получаем данные пользователя и его профиля
+    const userWithProfile = await this.prismaService.user.findUnique({
+      where: { id: userId },
+      include: {
+        profile: true, // Добавляем профиль пользователя
+      },
+    });
+
+    if (!userWithProfile) {
+      throw new UnauthorizedException('Пользователь не найден');
+    }
+
     return {
       isAuthenticated: true,
-      user: req.user // Возвращаем данные пользователя
+      user: userWithProfile, // Возвращаем пользователя и его профиль
+      token: req.cookies['accessToken'] || null, // Токен из cookies
     };
   }
 }

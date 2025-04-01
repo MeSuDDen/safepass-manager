@@ -16,12 +16,55 @@ model User {
   emailVerified    Boolean   @default(false)
   profileCompleted Boolean   @default(false)
 
-  credentials       UserCredentials?
   profile           UserProfile?
   tokens            UserTokens?
+  passwords         Passwords?
   logs              Log[]
   emailVerification EmailVerification?
   passwordReset     PasswordReset?
+  folders           Folder[]
+  userCredentials   UserCredentials[]
+}
+
+model Passwords {
+  id             String @id @default(uuid())
+  userId         String @unique
+  password       String
+  masterPassword String
+  User           User   @relation(fields: [userId], references: [id])
+}
+
+model UserCredentials {
+  id          String   @id @default(uuid()) // id будет строкой UUID
+  title       String // Название учетной записи
+  username    String // Логин для учетной записи
+  password    String // Пароль
+  url         String // URL ресурса
+  description String // Описание учетной записи
+  folderId    String? // id папки (может быть null)
+  createdAt   DateTime @default(now()) // Время создания
+  updatedAt   DateTime @updatedAt // Время последнего обновления
+  userId      String // id пользователя
+  user        User     @relation(fields: [userId], references: [id]) // Связь с пользователем
+  folder      Folder?  @relation(fields: [folderId], references: [id]) // Связь с папкой
+  Tag         Tag[]
+}
+
+model Folder {
+  id              String            @id @default(uuid()) // id папки
+  name            String // Название папки
+  userId          String // id пользователя
+  createdAt       DateTime          @default(now()) // Время создания
+  updatedAt       DateTime          @default(now()) @updatedAt // Время последнего обновления
+  user            User              @relation(fields: [userId], references: [id]) // Связь с пользователем
+  userCredentials UserCredentials[] // Связь с учетными записями
+}
+
+model Tag {
+  id                String           @id @default(uuid())
+  name              String           @unique
+  userCredentialsId String?
+  UserCredentials   UserCredentials? @relation(fields: [userCredentialsId], references: [id])
 }
 
 model PasswordReset {
@@ -33,14 +76,6 @@ model PasswordReset {
   createdAt  DateTime @default(now())
   expiresAt  DateTime
   isVerified Boolean
-}
-
-model UserCredentials {
-  id             String @id @default(uuid())
-  userId         String @unique
-  user           User   @relation(fields: [userId], references: [id])
-  password       String
-  masterPassword String
 }
 
 model UserProfile {
