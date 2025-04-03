@@ -7,7 +7,7 @@ import * as bcrypt from 'bcrypt';
 import { ConfigService } from '@nestjs/config';
 
 interface AuthRequest extends Request {
-  user?: { id: string };
+  user?: { id: string, email: string, role: string };
 }
 
 @Injectable()
@@ -79,15 +79,41 @@ export class TokenRefreshMiddleware implements NestMiddleware {
 
       console.log('Refresh token прошел проверку, создаем новые токены');
 
-      // Генерируем новые токены
+      // Найдем пользователя и получим его данные
+      const user = await this.prismaService.user.findUnique({
+        where: { id: refreshPayload.sub },
+        select: { id: true, email: true, role: true },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('Пользователь не найден');
+      }
+
+      console.log('User after refresh:', user);  // Логируем пользователя
+
+      // Генерируем новые токены с email и role
       const newAccessToken = this.jwtService.sign(
-        { sub: refreshPayload.sub },
-        { secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'), expiresIn: this.configService.getOrThrow<string>('JWT_ACCESS_EXPIRES') }
+        {
+          sub: refreshPayload.sub,
+          email: user.email,  // Добавляем email
+          role: user.role,    // Добавляем role
+        },
+        {
+          secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
+          expiresIn: this.configService.getOrThrow<string>('JWT_ACCESS_EXPIRES'),
+        }
       );
 
       const newRefreshToken = this.jwtService.sign(
-        { sub: refreshPayload.sub },
-        { secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'), expiresIn: this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRES') } // Например, 7 дней
+        {
+          sub: refreshPayload.sub,
+          email: user.email,  // Добавляем email
+          role: user.role,    // Добавляем role
+        },
+        {
+          secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+          expiresIn: this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRES'),
+        }
       );
 
       // Хэшируем новый refreshToken перед записью в БД
@@ -116,18 +142,8 @@ export class TokenRefreshMiddleware implements NestMiddleware {
 
       req.cookies.accessToken = newAccessToken;
       req.cookies.refreshToken = newRefreshToken;
-      // Найдем пользователя и получим его данные
-      const user = await this.prismaService.user.findUnique({
-        where: { id: refreshPayload.sub },
-        select: { id: true, email: true, role: true },
-      });
 
-      if (!user) {
-        throw new UnauthorizedException('Пользователь не найден');
-      }
-
-      req.user = user; // Теперь в req.user есть и role
-      console.log('User after refresh:', req.user);
+      req.user = user; // Теперь в req.user есть и role и email
 
       console.log('Новый accessToken и refreshToken установлены');
       return next();

@@ -1,4 +1,4 @@
-import {Routes, Route, Navigate} from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import "./index.css";
 import AuthLayout from "./components/Auth/AuthLayout/AuthLayout.tsx";
 
@@ -13,42 +13,46 @@ import VerifyEmail from "./pages/VerifyEmail.tsx";
 import Credentials from "./pages/Credentials.tsx";
 import Folders from "./pages/Folders.tsx";
 import Admin from "./pages/Admin.tsx";
+import NotAuthorized from "./pages/NotAuthorized.tsx"; // Импортируем страницу с ошибкой доступа
 
-import {AuthProvider} from "./context/AuthContext/AuthContext.tsx";
+import { AuthProvider } from "./context/AuthContext/AuthContext.tsx";
 import ProtectedRoute from "./components/ProtectedRoute/ProtectedRoute.tsx";
-import {Toaster} from "react-hot-toast";
+import { Toaster } from "react-hot-toast";
 import DashboardLayout from "./components/ui/DashboardLayout.tsx";
-
 
 function App() {
     return (
         <>
-            <Toaster position="top-center" toastOptions={{duration: 3000, removeDelay: 1000}}></Toaster>
+            <Toaster position="top-center" toastOptions={{ duration: 3000, removeDelay: 1000 }} />
             <AuthProvider>
                 <Routes>
 
-                    <Route path="/" element={<Navigate to="/login" replace/>}/>
+                    <Route path="/" element={<Navigate to="/login" replace />} />
 
                     {/* Авторизация */}
-                    <Route element={<AuthLayout/>}>
-                        <Route path="/login" element={<Login/>}/>
-                        <Route path="/register" element={<Register/>}/>
-                        <Route path="/reset" element={<Reset/>}/>
-                        <Route path="/verify-email/:hash" element={<VerifyEmail/>}/>
+                    <Route element={<AuthLayout />}>
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
+                        <Route path="/reset" element={<Reset />} />
+                        <Route path="/verify-email/:hash" element={<VerifyEmail />} />
                     </Route>
 
                     {/* Защищённый маршрут */}
-                    <Route element={<DashboardLayout/>}>
-                        <Route path="/dashboard/*" element={<ProtectedRoute><Dashboard/></ProtectedRoute>}/>
-                        <Route path="/credentials/*" element={<ProtectedRoute><Credentials/></ProtectedRoute>}/>
-                        <Route path="/folders/*" element={<ProtectedRoute><Folders/></ProtectedRoute>}/>
-                        <Route path="/admin-panel/*" element={<ProtectedRoute><Admin/></ProtectedRoute>}/>
+                    <Route element={<DashboardLayout />}>
+                        <Route path="/dashboard/*" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+                        <Route path="/credentials/*" element={<ProtectedRoute><Credentials /></ProtectedRoute>} />
+                        <Route path="/folders/*" element={<ProtectedRoute><Folders /></ProtectedRoute>} />
+                        <Route path="/admin-panel/*" element={<ProtectedRoute requireAdmin><Admin /></ProtectedRoute>} />
                     </Route>
+
                     {/* Политика конфиденциальности */}
-                    <Route path="/privacy-policy" element={<PrivacyPolicyPage/>}/>
+                    <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+
+                    {/* Ошибка доступа */}
+                    <Route path="/not-authorized" element={<NotAuthorized />} />
 
                     {/* Ошибка 404 */}
-                    <Route path="*" element={<NotFoundPage/>}/>
+                    <Route path="*" element={<NotFoundPage />} />
                 </Routes>
             </AuthProvider>
         </>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { useAuth } from "../context/AuthContext/AuthContext.tsx"; // Убедись, что импорт правильный
+import { useAuth } from "../context/AuthContext/AuthContext.tsx";
 import api from "../utils/axiosInstance.ts";
-import {Folder} from "../types"; // Убедись, что путь правильный
+import {Folder} from "../types";
 
 export const useDashboardData = () => {
     const { user } = useAuth();

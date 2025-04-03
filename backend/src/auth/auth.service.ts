@@ -121,14 +121,15 @@ export class AuthService {
     res.cookie('accessToken', tokens.accessToken, {
       httpOnly: true,  // Доступен только серверу (защита от XSS)
       secure: false,     // Только HTTPS (отключить в dev-режиме)
-      sameSite: 'lax',  // Lax: защита от CSRF
+      sameSite: 'strict',  // Lax: защита от CSRF
       maxAge: 15 * 60 * 1000
     });
 
     res.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: false,
-      sameSite: 'lax',
+      sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
     return tokens;
   }
@@ -208,12 +209,14 @@ export class AuthService {
       httpOnly: true,  // Доступен только серверу (защита от XSS)
       secure: process.env.NODE_ENV === 'production', // Только HTTPS в продакшене
       sameSite: 'strict',  // Защита от CSRF
+      maxAge: 15 * 60 * 1000
     });
 
     response.cookie('refreshToken', tokens.refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
+      maxAge: 7 * 24 * 60 * 60 * 1000
     });
 
     return tokens;
@@ -358,6 +361,7 @@ export class AuthService {
         },
       ),
     ]);
+    console.log(at, rt)
 
     return { accessToken: at, refreshToken: rt };
   }

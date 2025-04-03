@@ -20,15 +20,15 @@ export class UsersController {
   // Получаем всех пользователей
   @UseGuards(AccessTokenStrategy, RolesGuard)
   @Roles('admin')
-  @Get('all')
+  @Get('allUsers')
   async getAllUsers(@Req() req: AuthenticatedRequest) {
     return this.usersService.getFullUsers(req);
   }
 
   @UseGuards(AccessTokenStrategy, RolesGuard) // Защищаем JWT + проверяем роль
   @Roles('admin') // Указываем, что маршрут доступен только admin
-  @Get('admin')
+  @Get('/admin/dashboard/stats')
   async getAdminUsers(@Req() req: AuthenticatedRequest) {
-    return this.usersService.getFullAdminUsers(req);
+    return this.usersService.getStatsForAdminDashboard(req);
   }
 }

@@ -24,6 +24,7 @@ model User {
   passwordReset     PasswordReset?
   folders           Folder[]
   userCredentials   UserCredentials[]
+  block             Boolean            @default(false)
 }
 
 model Passwords {
