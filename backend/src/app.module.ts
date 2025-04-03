@@ -6,6 +6,9 @@ import { ConfigModule } from '@nestjs/config';
 import { CredentialsModule } from './credentials/credentials.module';
 import { FoldersModule } from './folders/folders.module';
 import { TagsModule } from './tags/tags.module';
+import { UsersModule } from './users/users.module';
+import { APP_GUARD } from '@nestjs/core';
+import { RolesGuard } from './auth/guards/roles.guard';
 
 @Module({
   imports: [ AuthModule, EmailModule,
@@ -15,8 +18,12 @@ import { TagsModule } from './tags/tags.module';
     CredentialsModule,
     FoldersModule,
     TagsModule,
+    UsersModule,
   ],
   controllers: [],
-  providers: [ PrismaService ]
+  providers: [ PrismaService, {
+    provide: APP_GUARD,
+    useClass: RolesGuard,
+  }, ]
 })
 export class AppModule {}

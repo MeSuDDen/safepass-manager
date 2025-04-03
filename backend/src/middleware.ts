@@ -38,7 +38,7 @@ export class TokenRefreshMiddleware implements NestMiddleware {
             secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
           });
 
-          req.user = { id: decoded.sub };
+          req.user = { id: decoded.sub, email: decoded.email, role: decoded.role };
           return next(); // Токен валиден, пропускаем запрос дальше
         } catch (err) {
           console.log('AccessToken истек, пробуем обновить...');
@@ -103,20 +103,31 @@ export class TokenRefreshMiddleware implements NestMiddleware {
       res.cookie('accessToken', newAccessToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'strict',
         maxAge: 15 * 60 * 1000,
       });
 
       res.cookie('refreshToken', newRefreshToken, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
-        sameSite: 'lax',
+        sameSite: 'strict',
         maxAge: 7 * 24 * 60 * 60 * 1000, // 7 дней
       });
 
       req.cookies.accessToken = newAccessToken;
       req.cookies.refreshToken = newRefreshToken;
-      req.user = { id: refreshPayload.sub };
+      // Найдем пользователя и получим его данные
+      const user = await this.prismaService.user.findUnique({
+        where: { id: refreshPayload.sub },
+        select: { id: true, email: true, role: true },
+      });
+
+      if (!user) {
+        throw new UnauthorizedException('Пользователь не найден');
+      }
+
+      req.user = user; // Теперь в req.user есть и role
+      console.log('User after refresh:', req.user);
 
       console.log('Новый accessToken и refreshToken установлены');
       return next();

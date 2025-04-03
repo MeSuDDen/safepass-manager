@@ -6,7 +6,8 @@ import { PrismaService } from '../../prisma/prisma.service';
 
 type JwtPayload = {
   sub: string;  // ID пользователя
-  email: string;  // Электронная почта
+  email: string;
+  role: string; // Электронная почта
 };
 
 @Injectable()
@@ -24,20 +25,21 @@ export class AccessTokenStrategy extends PassportStrategy(Strategy, 'jwt') {
   }
 
   async validate(payload: JwtPayload) {
-    console.log('Payload:', payload);
-
+    console.log('Payload:', payload);  // Логируем payload
     if (!payload.sub) {
       throw new UnauthorizedException('Некорректный токен');
     }
 
     const user = await this.prismaService.user.findUnique({
-      where: { id: payload.sub }, // Ищем пользователя по `sub`
+      where: { id: payload.sub },
+      select: { id: true, email: true, role: true }, // Выбираем нужные поля
     });
 
     if (!user) {
       throw new UnauthorizedException('Пользователь не найден');
     }
-
+    console.log('User from DB:', user)
+    // Если роль существует в payload, добавляем ее к пользователю
     return user;
   }
 }

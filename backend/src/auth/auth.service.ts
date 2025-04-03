@@ -26,42 +26,38 @@ export class AuthService {
 
   // Регистрация пользователя
   async signUp(registerDto: RegisterDto) {
-    // Проверка согласия пользователя
     if (!registerDto.agree) {
       throw new BadRequestException('Вы должны согласиться с условиями.');
     }
 
-    // Проверка на совпадение masterPassword и confirmMasterPassword
     if (registerDto.masterPassword !== registerDto.confirmMasterPassword) {
       throw new BadRequestException('Пароли не совпадают.');
     }
 
-    // Проверка уникальности email
     const existingUser = await this.prismaService.user.findUnique({
       where: { email: registerDto.email },
     });
+
     if (existingUser) {
       throw new BadRequestException('Пользователь с такой почтой уже существует!');
     }
 
-    // Хэширование паролей
     const hashedPassword = await this.hashPassword(registerDto.password);
     const hashedMasterPassword = await this.hashPassword(registerDto.masterPassword);
-
-    // Генерация кода подтверждения email
     const emailConfirmCode = crypto.randomInt(100000, 999999).toString();
-    const randomToken = crypto.randomBytes(32).toString('hex'); // Генерация случайного токена
+    const randomToken = crypto.randomBytes(32).toString('hex');
     const emailHash = crypto.createHash('sha256')
-      .update(registerDto.email + randomToken) // Добавляем случайный токен
+      .update(registerDto.email + randomToken)
       .digest('hex');
     const expiresAt = new Date();
     expiresAt.setHours(expiresAt.getHours() + 1);
 
-    // Создание пользователя в базе данных
+    const role = registerDto.role ?? 'user'; // Если роль не указана, назначаем 'user'
+
     await this.prismaService.user.create({
       data: {
         email: registerDto.email,
-        role: 'user',
+        role, // Устанавливаем роль
         passwords: {
           create: {
             password: hashedPassword,
@@ -78,15 +74,14 @@ export class AuthService {
       },
     });
 
-    // Отправка кода подтверждения на email
     await this.emailService.sendConfirmationEmail(registerDto.email, emailConfirmCode, emailHash);
 
-    // Возвращаем хэш в ответе
     return {
       message: 'Пользователь успешно зарегистрирован, проверьте почту для подтверждения',
-      emailVerificationHash: emailHash, // Возвращаем хэш в ответе
+      emailVerificationHash: emailHash,
     };
   }
+
 
   async correctHash(hash: string, code: string, res: Response ) : Promise<Tokens> {
     const emailVerification = await this.prismaService.emailVerification.findUnique({
@@ -108,7 +103,7 @@ export class AuthService {
     });
 
     // Генерируем JWT-токены
-    const tokens = await this.getTokens(emailVerification.user.id, emailVerification.user.email);
+    const tokens = await this.getTokens(emailVerification.user.id, emailVerification.user.email, emailVerification.user.role);
     const hashedRefreshToken = await this.hashRefreshToken(tokens.refreshToken);
 
     // Сохраняем refreshToken в БД
@@ -184,7 +179,8 @@ export class AuthService {
     }
 
     // Генерируем токены
-    const tokens = await this.getTokens(user.id, user.email);
+    console.log('Данные пользователя перед созданием токена:', user);
+    const tokens = await this.getTokens(user.id, user.email, user.role);
     const hashedRefreshToken = await this.hashRefreshToken(tokens.refreshToken);
 
     await this.prismaService.userTokens.upsert({
@@ -335,34 +331,39 @@ export class AuthService {
 
 
   // Генерация JWT-токенов
-  async getTokens(userId: string, email: string): Promise<Tokens> {
+  async getTokens(userId: string, email: string, role: string): Promise<Tokens> {
+    console.log('Создаём токен с ролью:', { userId, email, role });
+
     const [at, rt] = await Promise.all([
       this.jwtService.signAsync(
         {
           sub: userId,
           email,
+          role, // <-- Должно быть тут!
         },
         {
-          secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
-          expiresIn: this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRES'),
+          secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
+          expiresIn: this.configService.getOrThrow<string>('JWT_ACCESS_EXPIRES'),
         }
       ),
       this.jwtService.signAsync(
         {
           sub: userId,
-          email
+          email,
+          role, // <-- И тут!
         },
         {
-          secret: this.configService.getOrThrow<string>('JWT_ACCESS_SECRET'),
-          expiresIn: this.configService.getOrThrow<string>('JWT_ACCESS_EXPIRES')
+          secret: this.configService.getOrThrow<string>('JWT_REFRESH_SECRET'),
+          expiresIn: this.configService.getOrThrow<string>('JWT_REFRESH_EXPIRES'),
         },
       ),
     ]);
-    return {
-      accessToken: at,
-      refreshToken: rt,
-    }
-}
+
+    return { accessToken: at, refreshToken: rt };
+  }
+
+
+
 
   // Обновление Access Token с помощью Refresh Token
   async refreshAccessToken(userId: string, refreshToken: string): Promise<Tokens> {
@@ -386,7 +387,7 @@ export class AuthService {
     }
 
     // Генерация нового Access и Refresh токенов
-    const tokens = await this.getTokens(user.id, user.email);
+    const tokens = await this.getTokens(user.id, user.email, user.role);
 
     // Хэширование нового Refresh Token
     const hashedRefreshToken = await this.hashRefreshToken(tokens.refreshToken);

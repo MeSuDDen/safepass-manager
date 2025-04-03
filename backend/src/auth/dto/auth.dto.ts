@@ -2,8 +2,8 @@ import {
   IsBoolean,
   IsDate,
   IsEmail,
-  IsHash,
-  IsNotEmpty,
+  IsHash, IsIn,
+  IsNotEmpty, IsOptional,
   IsString,
   IsStrongPassword, IsUUID,
   Length,
@@ -33,6 +33,10 @@ export class RegisterDto {
   @IsString({ message: 'ППароль должен быть строкой' })
   confirmMasterPassword: string;
 
+
+  @IsOptional()
+  @IsIn(['user', 'admin']) // Только разрешенные роли
+  role?: string;
   // Уберите confirmMasterPassword, если он не должен быть частью DTO
   // Валидацию на совпадение masterPassword и confirmMasterPassword можно делать на уровне сервера, если поля для этого не отправляются
 
