@@ -12,9 +12,6 @@ export default {
             fontFamily: {
                 sans: ["Roboto", "sans-serif"],
             },
-            animation: {
-                pulseFast: 'pulse 0.1s ease-in-out infinite', // Устанавливаем более быструю пульсацию (0.5 сек)
-            },
         }
     },
     plugins: [

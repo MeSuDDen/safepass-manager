@@ -57,7 +57,7 @@ export default function DashboardPage() {
                                     key={tag}
                                     variant="outline"
                                     size="md"
-                                    onClick={() => navigate(`/search?tags=${tag}`)}
+                                    onClick={() => navigate(`/credentials?tags=${tag}`)}
                                     className="flex items-center cursor-pointer border-secondary"
                                 >
                                     <LuTag className="h-3 w-3 mr-1" />

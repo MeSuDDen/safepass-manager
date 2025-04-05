@@ -5,7 +5,7 @@ import { TbLockPassword } from "react-icons/tb";
 import logo from "../assets/images/main-logo.svg";
 import { useForm } from "react-hook-form";
 import { useAuth } from "../context/AuthContext/AuthContext.tsx";
-import {toast, Toaster} from "react-hot-toast";
+import {toast} from "react-hot-toast";
 import {useEffect, useState} from "react";
 import {LoginFormValues} from "../types";
 
@@ -40,7 +40,6 @@ export default function LoginPage() {
 
     return (
         <div className="flex flex-col gap-4 items-center">
-            <Toaster />
             <div className="flex justify-center gap-4 items-center">
                 <img src={logo} alt="SafePass" width="40px" />
                 <h1 className="font-bold text-3xl">SafePass</h1>

@@ -38,3 +38,12 @@ export interface User {
     role: string;
     profile?: UserProfile; // profile может быть undefined
 }
+
+export interface ICredentials {
+    id: number;
+    name: string;
+    login: string;
+    password: string;
+    folder: string;
+    tags: string[];
+}

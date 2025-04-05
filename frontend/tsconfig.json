@@ -6,6 +6,10 @@
 
   ],
   "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./frontend/src/*"]
+    },
     "strict": false
   }
 }

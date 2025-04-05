@@ -28,7 +28,7 @@ export default function AdminPanelCard({
 
     return (
         <Card className={`border-l-4 ${borderColorClass} rounded-lg`}>
-            <CardHeader className="flex flex-row items-center justify-between pb-2 px-4 pt-4">
+            <CardHeader className="flex flex-row items-center justify-between pb-2 px-4 pt-4 bg">
                 <h1 className="text-sm font-medium">{title}</h1>
                 <div className="h-8 w-8 rounded-md bg-gray-200 flex items-center justify-center">
                     {icon}
